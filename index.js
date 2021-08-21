@@ -19,10 +19,8 @@ const appraiser = setting.appraiser;
 
 async function getIpv4Address() {
     const response = await axios.get(appraiser,{
-        auth: {
-            username: accessToken,
-            password: accessTokenSecret
-        }
+        headers : { "User-Agent" : setting.userAgent },
+        data : {}
     });
 
     return response.data;

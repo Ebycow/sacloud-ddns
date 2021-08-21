@@ -1,3 +1,4 @@
+# sacloud-ddns
 ## setting.json
 ```
 {
@@ -9,5 +10,6 @@
         "www"
     ],
     "appraiser" : "http://...( IPv4 address of text/plain )"
+    "userAgent" : "curl" or "http"
 }
 ```
