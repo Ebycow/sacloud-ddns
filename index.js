@@ -1,6 +1,8 @@
 const fs = require('fs');
 const axios = require('axios');
 const cron = require('node-cron');
+const { getIpv4AddressFromRTXRouter } = require('./rtxgrabber');
+const { exec } = require('child_process');
 
 const setting = JSON.parse(fs.readFileSync('./setting.json'));
 
@@ -18,12 +20,16 @@ const recordNames = setting.recordNames;
 const appraiser = setting.appraiser;
 
 async function getIpv4Address() {
-    const response = await axios.get(appraiser,{
-        headers : { "User-Agent" : setting.userAgent },
-        data : {}
-    });
+    if (setting.useRtx) {
+        return await getIpv4AddressFromRTXRouter(setting.routerIp, setting.routerPort, setting.routerPassword);
+    } else {
+        const response = await axios.get(appraiser, {
+            headers: { "User-Agent": setting.userAgent },
+            data: {}
+        });
 
-    return response.data;
+        return response.data;
+    }
 }
 
 async function getRecordSets() {
@@ -75,6 +81,20 @@ async function putSetting(recordSets) {
 
 }
 
+function onIpChange(newIp) {
+    const scriptPath = './hook.sh'; // コールバックで実行するbashスクリプトのパス
+    exec(`bash ${scriptPath} ${newIp}`, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error executing script: ${error}`);
+            return;
+        }
+        console.log(`Script output: ${stdout}`);
+        if (stderr) {
+            console.error(`Script error output: ${stderr}`);
+        }
+    });
+}
+
 (async() => {
     let address = await getIpv4Address();
     console.log(new Date, "address=", address)
@@ -85,15 +105,20 @@ async function putSetting(recordSets) {
     await putSetting(recordSets);
     console.log('done!');
 
+    onIpChange(address);
+
     cron.schedule(updateCronExpression, async() => {
         const currentAddress = await getIpv4Address();
         console.log(new Date, "address=", currentAddress)
         if(address !== currentAddress){
             address = currentAddress;
             console.log('update...');
+            recordSets = await getRecordSets();
             recordSets = changeRecordSets(recordSets, address);
             await putSetting(recordSets);
             console.log('done!');
+
+            onIpChange(address);
         }
     });
     
